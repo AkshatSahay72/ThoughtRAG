@@ -20,6 +20,14 @@ class FaissVectorStore:
 
     def build_from_documents(self, documents: List[Any]):
         print(f"[INFO] Building vector store from {len(documents)} raw documents...")
+        if not documents:
+            print("[WARNING] No documents to build from. Initializing empty vector store.")
+            if self.index is None:
+                dim = self.model.get_sentence_embedding_dimension()
+                self.index = faiss.IndexFlatL2(dim)
+            self.save()
+            return
+            
         try:
             emb_pipe = EmbeddingPipeline(model_name=self.embedding_model, chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
             chunks = emb_pipe.chunk_documents(documents)

@@ -21,19 +21,34 @@ class RAGSearch:
         self.llm = ChatGroq(groq_api_key=groq_api_key, model_name=llm_model)
         print(f"[INFO] Groq LLM initialized: {llm_model}")
 
-    def search_and_summarize(self, query: str, top_k: int = 5) -> str:
+    def search_and_respond(self, query: str, top_k: int = 5) -> dict:
         results = self.vectorstore.query(query, top_k=top_k)
-        texts = [r["metadata"].get("text", "") for r in results if r["metadata"]]
+        texts = []
+        sources = []
+        for r in results:
+            if r["metadata"]:
+                texts.append(r["metadata"].get("text", ""))
+                sources.append({
+                    "doc": os.path.basename(r["metadata"].get("source", "unknown")),
+                    "page": r["metadata"].get("page", 0)
+                })
+        
         context = "\n\n".join(texts)
         if not context:
-            return "No relevant documents found."
-        prompt = f"""Summarize the following context for the query: '{query}'\n\nContext:\n{context}\n\nSummary:"""
+            return {"answer": "No relevant documents found.", "sources": []}
+            
+        prompt = f"""Use the following context to answer the query: '{query}'\n\nContext:\n{context}\n\nAnswer:"""
         response = self.llm.invoke([prompt])
-        return response.content
+        
+        return {
+            "answer": response.content,
+            "sources": sources
+        }
 
 # Example usage
 if __name__ == "__main__":
     rag_search = RAGSearch()
     query = "What is attention mechanism?"
-    summary = rag_search.search_and_summarize(query, top_k=3)
-    print("Summary:", summary)
+    result = rag_search.search_and_respond(query, top_k=3)
+    print("Answer:", result["answer"])
+    print("Sources:", result["sources"])

@@ -20,22 +20,56 @@ class FaissVectorStore:
 
     def build_from_documents(self, documents: List[Any]):
         print(f"[INFO] Building vector store from {len(documents)} raw documents...")
-        emb_pipe = EmbeddingPipeline(model_name=self.embedding_model, chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
-        chunks = emb_pipe.chunk_documents(documents)
-        embeddings = emb_pipe.embed_chunks(chunks)
-        metadatas = [{"text": chunk.page_content} for chunk in chunks]
-        self.add_embeddings(np.array(embeddings).astype('float32'), metadatas)
-        self.save()
-        print(f"[INFO] Vector store built and saved to {self.persist_dir}")
+        try:
+            emb_pipe = EmbeddingPipeline(model_name=self.embedding_model, chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
+            chunks = emb_pipe.chunk_documents(documents)
+            embeddings = emb_pipe.embed_chunks(chunks)
+        except Exception as e:
+            print(f"[ERROR] Embedding pipeline failed: {e}")
+            raise Exception(f"Embedding pipeline failed: {e}")
+
+        metadatas = []
+        for chunk in chunks:
+            source = chunk.metadata.get("source", "unknown")
+            page = chunk.metadata.get("page", 0)
+            if "source_file" in chunk.metadata:
+                source = chunk.metadata["source_file"]
+            metadatas.append({
+                "text": chunk.page_content,
+                "source": source,
+                "page": page
+            })
+            
+        try:
+            embeddings_array = np.array(embeddings).astype('float32')
+            if embeddings_array.size == 0:
+                raise ValueError("Generated empty embeddings array.")
+            self.add_embeddings(embeddings_array, metadatas)
+            self.save()
+            print(f"[INFO] Vector store built and saved to {self.persist_dir}")
+        except Exception as e:
+            print(f"[ERROR] Failed to insert or save embeddings: {e}")
+            raise Exception(f"Failed to insert into vector store: {e}")
 
     def add_embeddings(self, embeddings: np.ndarray, metadatas: List[Any] = None):
-        dim = embeddings.shape[1]
-        if self.index is None:
-            self.index = faiss.IndexFlatL2(dim)
-        self.index.add(embeddings)
-        if metadatas:
-            self.metadata.extend(metadatas)
-        print(f"[INFO] Added {embeddings.shape[0]} vectors to Faiss index.")
+        try:
+            if embeddings is None or embeddings.size == 0 or len(embeddings.shape) < 2:
+                print("[WARNING] Skipping vector insertion: embeddings array is empty or lacks 2 dimensions.")
+                return
+                
+            dim = embeddings.shape[1]
+            if self.index is None:
+                self.index = faiss.IndexFlatL2(dim)
+            elif self.index.d != dim:
+                raise ValueError(f"Dimension mismatch: Index expects {self.index.d}, got {dim}")
+                
+            self.index.add(embeddings)
+            if metadatas:
+                self.metadata.extend(metadatas)
+            print(f"[INFO] Added {embeddings.shape[0]} vectors to Faiss index.")
+        except Exception as e:
+            print(f"[ERROR] FAISS core error: {e}")
+            raise e
 
     def save(self):
         faiss_path = os.path.join(self.persist_dir, "faiss.index")

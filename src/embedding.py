@@ -12,17 +12,34 @@ class EmbeddingPipeline:
         print(f"[INFO] Loaded embedding model: {model_name}")
 
     def chunk_documents(self, documents: List[Any]) -> List[Any]:
+        print(f"[DEBUG] Loaded {len(documents)} raw documents for chunking.")
+        if documents and hasattr(documents[0], 'page_content'):
+            sample_content = documents[0].page_content[:150].replace('\n', ' ')
+            print(f"[DEBUG] Sample document content: '{sample_content}...'")
+
+        # Safely filter documents to ensure we only process those with text content
+        valid_docs = [doc for doc in documents if hasattr(doc, 'page_content') and doc.page_content.strip()]
+        print(f"[DEBUG] Valid documents after filtering empty content: {len(valid_docs)}")
+
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
             length_function=len,
             separators=["\n\n", "\n", " ", ""]
         )
-        chunks = splitter.split_documents(documents)
-        print(f"[INFO] Split {len(documents)} documents into {len(chunks)} chunks.")
+        chunks = splitter.split_documents(valid_docs)
+        print(f"[INFO] Split {len(valid_docs)} valid documents into {len(chunks)} chunks.")
+        
+        if len(chunks) == 0:
+            raise ValueError(f"Chunking resulted in 0 chunks from {len(valid_docs)} valid documents. Documents might be empty or un-splittable.")
+            
         return chunks
 
     def embed_chunks(self, chunks: List[Any]) -> np.ndarray:
+        if not chunks:
+            print("[WARNING] Skipping embedding generation: chunks list is empty.")
+            return np.array([])
+            
         texts = [chunk.page_content for chunk in chunks]
         print(f"[INFO] Generating embeddings for {len(texts)} chunks...")
         embeddings = self.model.encode(texts, show_progress_bar=True)

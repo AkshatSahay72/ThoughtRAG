@@ -1,4 +1,27 @@
-.venv
+# Virtual env
+.venv/
+
+# Environment variables
 .env
-data
-faiss_store
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Data files (ignore content, not structure)
+data/pdf_files/*
+data/text_files/*
+data/vector_store/*
+
+# Keep folders (important)
+!data/pdf_files/.gitkeep
+!data/text_files/.gitkeep
+!data/vector_store/.gitkeep
+
+# Vector DB
+faiss_store/
+chroma_db/
+
+# OS junk
+.DS_Store
+Thumbs.db

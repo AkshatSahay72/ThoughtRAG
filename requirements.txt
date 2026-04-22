@@ -10,3 +10,4 @@ chromadb
 numpy
 langchain-groq
 python-dotenv
+gradio

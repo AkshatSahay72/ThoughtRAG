@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.git
+.gitignore
+.github/
+Dockerfile
+.dockerignore
+data/pdf_files/*
+!data/pdf_files/.gitkeep
+faiss_store/*
+!faiss_store/.gitkeep
